@@ -4,6 +4,7 @@ import re
 from typing import Iterable
 
 from .base import Parser, NormalizedBlock, EventData
+from .utils import parse_int_value
 
 DELTA = re.compile(
     r"Juc(?:ătorului|atorului): (?P<name>.+?)\((?P<id>\d+)\) i-au fost (?P<action>luati|adaugati) (?P<amount>[\d.,]+) \$"
@@ -18,21 +19,37 @@ class PhoneParser(Parser):
         return (block.title or "").strip() == "💵 Telefon"
 
     def parse(self, block: NormalizedBlock) -> Iterable[EventData]:
-        debits: list[tuple[str, float, str, int]] = []
-        credits: list[tuple[str, float, str, int]] = []
+        debits: list[tuple[str, int, str, int, int]] = []
+        credits: list[tuple[str, int, str, int, int]] = []
         for payload in block.payload:
             line = payload.text
             if match := DELTA.search(line):
-                amount = _parse_amount(match.group("amount"))
+                amount = parse_int_value(match.group("amount"))
                 player_id = match.group("id")
                 if match.group("action") == "luati":
-                    debits.append((player_id, amount, payload.raw_block_id, payload.raw_line_index))
+                    debits.append(
+                        (
+                            player_id,
+                            amount,
+                            payload.raw_block_id,
+                            payload.raw_line_index,
+                            payload.global_line_no,
+                        )
+                    )
                 else:
-                    credits.append((player_id, amount, payload.raw_block_id, payload.raw_line_index))
+                    credits.append(
+                        (
+                            player_id,
+                            amount,
+                            payload.raw_block_id,
+                            payload.raw_line_index,
+                            payload.global_line_no,
+                        )
+                    )
 
         used_credit = set()
         for debit in debits:
-            debit_id, amount, raw_block_id, raw_line_index = debit
+            debit_id, amount, raw_block_id, raw_line_index, global_line_no = debit
             paired_index = None
             for idx, credit in enumerate(credits):
                 if idx in used_credit:
@@ -47,18 +64,20 @@ class PhoneParser(Parser):
                     event_type="PHONE_TRANSFER",
                     src_player_id=debit_id,
                     dst_player_id=credit[0],
-                    amount=amount,
+                    money=amount,
                     raw_block_id=raw_block_id,
                     raw_line_index=raw_line_index,
+                    global_line_no=global_line_no,
                 )
             else:
                 yield EventData(
                     event_type="PHONE_DELTA",
                     src_player_id=debit_id,
-                    amount=amount,
+                    money=amount,
                     metadata={"sign": "debit"},
                     raw_block_id=raw_block_id,
                     raw_line_index=raw_line_index,
+                    global_line_no=global_line_no,
                 )
 
         for idx, credit in enumerate(credits):
@@ -67,12 +86,9 @@ class PhoneParser(Parser):
             yield EventData(
                 event_type="PHONE_DELTA",
                 src_player_id=credit[0],
-                amount=credit[1],
+                money=credit[1],
                 metadata={"sign": "credit"},
                 raw_block_id=credit[2],
                 raw_line_index=credit[3],
+                global_line_no=credit[4],
             )
-
-
-def _parse_amount(value: str) -> float:
-    return float(value.replace(".", "").replace(",", "."))

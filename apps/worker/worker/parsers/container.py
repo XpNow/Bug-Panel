@@ -4,6 +4,7 @@ import re
 from typing import Iterable
 
 from .base import Parser, NormalizedBlock, EventData
+from .utils import parse_int_value
 
 PUT = re.compile(
     r"\[TRANSFER\].*?\[(?P<id>\d+)\] a pus in (?P<container>.+?) item-ul (?P<item>.+?)\(x(?P<qty>[\d.,]+)\)\."
@@ -32,9 +33,10 @@ class ContainerParser(Parser):
                     src_player_id=match.group("id"),
                     container=match.group("container").strip(),
                     item=match.group("item").strip(),
-                    qty=_parse_amount(match.group("qty")),
+                    qty=parse_int_value(match.group("qty")),
                     raw_block_id=payload.raw_block_id,
                     raw_line_index=payload.raw_line_index,
+                    global_line_no=payload.global_line_no,
                 )
             elif match := TAKE.search(line):
                 yield EventData(
@@ -42,9 +44,10 @@ class ContainerParser(Parser):
                     src_player_id=match.group("id"),
                     container=match.group("container").strip(),
                     item=match.group("item").strip(),
-                    qty=_parse_amount(match.group("qty")),
+                    qty=parse_int_value(match.group("qty")),
                     raw_block_id=payload.raw_block_id,
                     raw_line_index=payload.raw_line_index,
+                    global_line_no=payload.global_line_no,
                 )
             elif match := SEARCH.search(line):
                 yield EventData(
@@ -52,11 +55,8 @@ class ContainerParser(Parser):
                     src_player_id=match.group("sid"),
                     dst_player_id=match.group("target").strip(),
                     item=match.group("item").strip(),
-                    qty=_parse_amount(match.group("qty")),
+                    qty=parse_int_value(match.group("qty")),
                     raw_block_id=payload.raw_block_id,
                     raw_line_index=payload.raw_line_index,
+                    global_line_no=payload.global_line_no,
                 )
-
-
-def _parse_amount(value: str) -> float:
-    return float(value.replace(".", "").replace(",", "."))

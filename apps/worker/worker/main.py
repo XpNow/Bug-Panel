@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import time
 
 from .db import SessionLocal
@@ -10,6 +11,7 @@ POLL_INTERVAL = 2
 
 
 def main() -> None:
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     while True:
         with SessionLocal() as db:
             runner = IngestRunner(db)

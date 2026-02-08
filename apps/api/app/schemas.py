@@ -10,13 +10,18 @@ from pydantic import BaseModel, Field
 class UploadCreate(BaseModel):
     filename: str
     size: int
+    chunk_size: int = 1024 * 1024
+    expected_chunks: int | None = None
 
 
 class UploadSessionOut(BaseModel):
     id: UUID
     filename: str
     size: int
-    completed: bool
+    status: str
+    chunk_size: int
+    expected_chunks: int | None
+    received_chunks: list[int]
 
 
 class SourceFileOut(BaseModel):
@@ -33,7 +38,7 @@ class IngestJobCreate(BaseModel):
 
 
 class IngestJobOut(BaseModel):
-    id: UUID
+    id: int
     source_file_id: UUID
     status: str
     progress_json: dict | None
@@ -45,6 +50,7 @@ class IngestJobOut(BaseModel):
 
 class EventOut(BaseModel):
     id: UUID
+    ingest_job_id: int
     occurred_at: Optional[datetime]
     occurred_at_quality: str
     event_type: str
@@ -52,17 +58,21 @@ class EventOut(BaseModel):
     dst_player_id: Optional[str]
     item: Optional[str]
     container: Optional[str]
-    amount: Optional[float]
-    qty: Optional[float]
+    money: Optional[int]
+    qty: Optional[int]
     metadata: dict | None
     raw_block_id: UUID
     raw_line_index: int
+    global_line_no: int
 
 
 class EvidenceOut(BaseModel):
     raw_block_id: UUID
     line_index: int
-    context: list[str]
+    line: str
+    context_before: list[str]
+    context_after: list[str]
+    global_line_no: int | None = None
 
 
 class ReportPackCreate(BaseModel):

@@ -4,6 +4,7 @@ import re
 from typing import Iterable
 
 from .base import Parser, NormalizedBlock, EventData
+from .utils import parse_int_value
 
 DROP = re.compile(
     r"Juc(?:ător|ator): (?P<name>.+?) \((?P<id>\d+)\) a aruncat pe jos (?P<qty>[\d.,]+)x (?P<item>.+)"
@@ -25,11 +26,8 @@ class DropItemParser(Parser):
                     src_player_id=match.group("id"),
                     container="ground",
                     item=match.group("item").strip(),
-                    qty=_parse_amount(match.group("qty")),
+                    qty=parse_int_value(match.group("qty")),
                     raw_block_id=payload.raw_block_id,
                     raw_line_index=payload.raw_line_index,
+                    global_line_no=payload.global_line_no,
                 )
-
-
-def _parse_amount(value: str) -> float:
-    return float(value.replace(".", "").replace(",", "."))

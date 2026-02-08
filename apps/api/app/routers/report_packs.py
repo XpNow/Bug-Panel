@@ -34,6 +34,7 @@ def create_report_pack(payload: ReportPackCreate, db: Session = Depends(get_db))
     filters = payload.filters or {}
     event_type = filters.get("event_type")
     player_id = filters.get("player_id")
+    ingest_job_id = filters.get("ingest_job_id")
     start = filters.get("start")
     end = filters.get("end")
 
@@ -49,6 +50,8 @@ def create_report_pack(payload: ReportPackCreate, db: Session = Depends(get_db))
     )
     if event_type:
         query = query.filter(DictEventType.key == event_type)
+    if ingest_job_id:
+        query = query.filter(Event.ingest_job_id == ingest_job_id)
     if player_id:
         query = query.filter((src_player.player_id == player_id) | (dst_player.player_id == player_id))
     if start:
@@ -78,8 +81,9 @@ def create_report_pack(payload: ReportPackCreate, db: Session = Depends(get_db))
                 "dst_player_id",
                 "item",
                 "container",
-                "amount",
+                "money",
                 "qty",
+                "ingest_job_id",
                 "raw_block_id",
                 "raw_line_index",
             ]
@@ -96,8 +100,9 @@ def create_report_pack(payload: ReportPackCreate, db: Session = Depends(get_db))
                     dst.player_id if dst else "",
                     item.name if item else "",
                     container.key if container else "",
-                    float(event.amount) if event.amount is not None else "",
-                    float(event.qty) if event.qty is not None else "",
+                    event.money if event.money is not None else "",
+                    event.qty if event.qty is not None else "",
+                    event.ingest_job_id,
                     str(event.raw_block_id),
                     event.raw_line_index,
                 ]

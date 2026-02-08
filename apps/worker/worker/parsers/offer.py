@@ -4,6 +4,7 @@ import re
 from typing import Iterable
 
 from .base import Parser, NormalizedBlock, EventData
+from .utils import parse_int_value
 
 MONEY = re.compile(
     r"Jucatorul (?P<src>.+?)\[(?P<src_id>\d+)\] i-a oferit lui (?P<dst>.+?)\[(?P<dst_id>\d+)\] suma de (?P<amount>[\d.,]+)\$\."
@@ -28,9 +29,10 @@ class OfferParser(Parser):
                     event_type="OFFER_MONEY",
                     src_player_id=match.group("src_id"),
                     dst_player_id=match.group("dst_id"),
-                    amount=_parse_amount(match.group("amount")),
+                    money=parse_int_value(match.group("amount")),
                     raw_block_id=payload.raw_block_id,
                     raw_line_index=payload.raw_line_index,
+                    global_line_no=payload.global_line_no,
                 )
             elif match := ITEM.search(line):
                 item = match.group("item").strip()
@@ -43,12 +45,9 @@ class OfferParser(Parser):
                     src_player_id=match.group("src_id"),
                     dst_player_id=match.group("dst_id"),
                     item=item,
-                    qty=_parse_amount(match.group("qty")),
+                    qty=parse_int_value(match.group("qty")),
                     metadata=metadata or None,
                     raw_block_id=payload.raw_block_id,
                     raw_line_index=payload.raw_line_index,
+                    global_line_no=payload.global_line_no,
                 )
-
-
-def _parse_amount(value: str) -> float:
-    return float(value.replace(".", "").replace(",", "."))

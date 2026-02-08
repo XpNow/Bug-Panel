@@ -17,12 +17,16 @@ router = APIRouter(prefix="/uploads", tags=["uploads"])
 @router.post("/create", response_model=UploadSessionOut)
 def create_upload(payload: UploadCreate, db: Session = Depends(get_db)):
     upload_id = uuid.uuid4()
-    temp_path = object_store.create_upload(str(upload_id))
+    temp_prefix = object_store.create_upload_prefix(str(upload_id))
     session = UploadSession(
         id=upload_id,
         filename=payload.filename,
         size=payload.size,
-        temp_path=str(temp_path),
+        status="OPEN",
+        chunk_size=payload.chunk_size,
+        expected_chunks=payload.expected_chunks,
+        received_chunks=[],
+        temp_prefix=str(temp_prefix),
     )
     db.add(session)
     db.commit()
@@ -31,7 +35,10 @@ def create_upload(payload: UploadCreate, db: Session = Depends(get_db)):
         id=session.id,
         filename=session.filename,
         size=session.size,
-        completed=session.completed,
+        status=session.status,
+        chunk_size=session.chunk_size,
+        expected_chunks=session.expected_chunks,
+        received_chunks=session.received_chunks or [],
     )
 
 
@@ -45,10 +52,20 @@ def upload_chunk(
     session = db.get(UploadSession, upload_id)
     if not session:
         raise HTTPException(status_code=404, detail="Upload session not found")
-    if session.completed:
+    if session.status != "OPEN":
         raise HTTPException(status_code=409, detail="Upload already finalized")
-    object_store.append_chunk(Path(session.temp_path), data)
-    return {"status": "ok", "index": index, "received": len(data)}
+    prefix = Path(session.temp_prefix)
+    object_store.write_chunk(prefix, index, data)
+    received = set(session.received_chunks or [])
+    received.add(index)
+    session.received_chunks = sorted(received)
+    db.commit()
+    return {
+        "status": "ok",
+        "index": index,
+        "received": len(data),
+        "received_chunks": session.received_chunks,
+    }
 
 
 @router.post("/{upload_id}/finalize", response_model=SourceFileOut)
@@ -56,12 +73,35 @@ def finalize_upload(upload_id: uuid.UUID, db: Session = Depends(get_db)):
     session = db.get(UploadSession, upload_id)
     if not session:
         raise HTTPException(status_code=404, detail="Upload session not found")
-    if session.completed:
+    if session.status == "FINALIZED":
+        existing = db.query(SourceFile).filter(SourceFile.sha256 == session.final_sha256).one_or_none()
+        if existing:
+            return SourceFileOut(
+                id=existing.id,
+                sha256=existing.sha256,
+                name=existing.name,
+                size=existing.size,
+                uri=existing.uri,
+                created_at=existing.created_at,
+            )
         raise HTTPException(status_code=409, detail="Upload already finalized")
-    digest, target, size = object_store.finalize_upload(Path(session.temp_path), session.filename)
+    expected = session.expected_chunks
+    if expected is not None and len(session.received_chunks or []) < expected:
+        raise HTTPException(status_code=409, detail="Missing chunks")
+    prefix = Path(session.temp_prefix)
+    chunk_paths = sorted(prefix.glob("chunk_*.part"))
+    digest, target, size = object_store.finalize_upload(chunk_paths)
+    for path in chunk_paths:
+        path.unlink(missing_ok=True)
+    try:
+        prefix.rmdir()
+    except OSError:
+        pass
     existing = db.query(SourceFile).filter(SourceFile.sha256 == digest).one_or_none()
     if existing:
-        session.completed = True
+        session.status = "FINALIZED"
+        session.final_sha256 = digest
+        session.final_uri = str(target)
         db.commit()
         return SourceFileOut(
             id=existing.id,
@@ -77,7 +117,9 @@ def finalize_upload(upload_id: uuid.UUID, db: Session = Depends(get_db)):
         size=size,
         uri=str(target),
     )
-    session.completed = True
+    session.status = "FINALIZED"
+    session.final_sha256 = digest
+    session.final_uri = str(target)
     db.add(source_file)
     db.commit()
     db.refresh(source_file)

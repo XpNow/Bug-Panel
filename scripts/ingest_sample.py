@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 from pathlib import Path
 
@@ -13,8 +14,15 @@ CHUNK_SIZE = 1024 * 1024
 
 def main() -> None:
     size = SAMPLE_PATH.stat().st_size
+    expected_chunks = math.ceil(size / CHUNK_SIZE)
     response = requests.post(
-        f"{API_BASE}/uploads/create", json={"filename": SAMPLE_PATH.name, "size": size}
+        f"{API_BASE}/uploads/create",
+        json={
+            "filename": SAMPLE_PATH.name,
+            "size": size,
+            "chunk_size": CHUNK_SIZE,
+            "expected_chunks": expected_chunks,
+        },
     )
     response.raise_for_status()
     upload_id = response.json()["id"]

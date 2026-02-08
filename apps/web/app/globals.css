@@ -68,6 +68,25 @@ body {
   border-radius: 12px;
 }
 
+button,
+input {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #1f2a37;
+  background: #0f172a;
+  color: #e5e7eb;
+}
+
+button {
+  cursor: pointer;
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+button:hover {
+  background: #1d4ed8;
+}
+
 .badge {
   display: inline-block;
   padding: 4px 8px;

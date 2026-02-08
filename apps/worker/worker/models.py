@@ -4,14 +4,12 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
-    Boolean,
+    BigInteger,
     DateTime,
     ForeignKey,
     Integer,
-    Numeric,
     String,
     Text,
-    UniqueConstraint,
     JSON,
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -37,15 +35,20 @@ class UploadSession(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     filename: Mapped[str] = mapped_column(String(255))
     size: Mapped[int] = mapped_column(Integer)
-    temp_path: Mapped[str] = mapped_column(String(500))
-    completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    status: Mapped[str] = mapped_column(String(20), default="OPEN")
+    chunk_size: Mapped[int] = mapped_column(Integer)
+    expected_chunks: Mapped[int | None] = mapped_column(Integer)
+    received_chunks: Mapped[list[int] | None] = mapped_column(JSON, default=list)
+    temp_prefix: Mapped[str] = mapped_column(String(500))
+    final_sha256: Mapped[str | None] = mapped_column(String(64))
+    final_uri: Mapped[str | None] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
 
 class IngestJob(Base):
     __tablename__ = "ingest_job"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     source_file_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("source_file.id"))
     status: Mapped[str] = mapped_column(String(40), default="queued")
     progress_json: Mapped[dict | None] = mapped_column(JSON, default=dict)
@@ -105,12 +108,10 @@ class DictAlias(Base):
 
 class Event(Base):
     __tablename__ = "event"
-    __table_args__ = (
-        UniqueConstraint("dedupe_hash", name="uq_event_dedupe"),
-    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     source_file_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("source_file.id"))
+    ingest_job_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("ingest_job.id"))
     parser_id: Mapped[str] = mapped_column(String(50))
     parser_version: Mapped[str] = mapped_column(String(20))
     occurred_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -120,12 +121,13 @@ class Event(Base):
     dst_player_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("dict_player.id"))
     item_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("dict_item.id"))
     container_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("dict_container.id"))
-    amount: Mapped[Numeric | None] = mapped_column(Numeric(20, 2))
-    qty: Mapped[Numeric | None] = mapped_column(Numeric(20, 2))
+    money: Mapped[int | None] = mapped_column(BigInteger)
+    qty: Mapped[int | None] = mapped_column(BigInteger)
     metadata: Mapped[dict | None] = mapped_column(JSON, default=dict)
     raw_block_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("raw_block.id"))
     raw_line_index: Mapped[int] = mapped_column(Integer)
-    dedupe_hash: Mapped[str] = mapped_column(String(64))
+    global_line_no: Mapped[int] = mapped_column(BigInteger)
+    dedupe_key: Mapped[str] = mapped_column(String(80))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
 
@@ -133,7 +135,7 @@ class UnknownSignature(Base):
     __tablename__ = "unknown_signature"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    ingest_job_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("ingest_job.id"))
+    ingest_job_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("ingest_job.id"))
     signature: Mapped[str] = mapped_column(String(400))
     count: Mapped[int] = mapped_column(Integer, default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)

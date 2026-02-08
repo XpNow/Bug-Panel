@@ -4,6 +4,7 @@ import re
 from typing import Iterable
 
 from .base import Parser, NormalizedBlock, EventData
+from .utils import parse_int_value
 
 BUY = re.compile(
     r"Juc(?:ător|ator): (?P<name>.+?)\((?P<id>\d+)\) a cumparat (?P<item>.+?) pentru suma de (?P<amount>[\d.,]+)\$"
@@ -24,11 +25,8 @@ class JewelryParser(Parser):
                     event_type="JEWELRY_BUY",
                     src_player_id=match.group("id"),
                     item=match.group("item").strip(),
-                    amount=_parse_amount(match.group("amount")),
+                    money=parse_int_value(match.group("amount")),
                     raw_block_id=payload.raw_block_id,
                     raw_line_index=payload.raw_line_index,
+                    global_line_no=payload.global_line_no,
                 )
-
-
-def _parse_amount(value: str) -> float:
-    return float(value.replace(".", "").replace(",", "."))

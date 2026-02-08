@@ -4,6 +4,7 @@ import re
 from typing import Iterable
 
 from .base import Parser, NormalizedBlock, EventData
+from .utils import parse_int_value
 
 GIVE_MONEY = re.compile(
     r"(?P<staff>.+?)\[(?P<staff_id>\d+)\] i-a dat lui (?P<target>.+?)\[(?P<target_id>\d+)\] suma de (?P<amount>[\d.,]+)\$"
@@ -28,10 +29,11 @@ class AdminParser(Parser):
                     event_type="ADMIN_GIVE_MONEY",
                     src_player_id=match.group("staff_id"),
                     dst_player_id=match.group("target_id"),
-                    amount=_parse_amount(match.group("amount")),
+                    money=parse_int_value(match.group("amount")),
                     metadata={"staff_rank": _extract_rank(match.group("staff"))},
                     raw_block_id=payload.raw_block_id,
                     raw_line_index=payload.raw_line_index,
+                    global_line_no=payload.global_line_no,
                 )
             elif match := GIVE_ITEM.search(line):
                 yield EventData(
@@ -39,15 +41,12 @@ class AdminParser(Parser):
                     src_player_id=match.group("staff_id"),
                     dst_player_id=match.group("target_id"),
                     item=match.group("item").strip(),
-                    qty=_parse_amount(match.group("qty")),
+                    qty=parse_int_value(match.group("qty")),
                     metadata={"staff_rank": _extract_rank(match.group("staff"))},
                     raw_block_id=payload.raw_block_id,
                     raw_line_index=payload.raw_line_index,
+                    global_line_no=payload.global_line_no,
                 )
-
-
-def _parse_amount(value: str) -> float:
-    return float(value.replace(".", "").replace(",", "."))
 
 
 def _extract_rank(name: str) -> str | None:

@@ -43,7 +43,9 @@ class BlockState:
     payload: list[PayloadLine]
 
 
-def normalize_lines(lines: Iterator[tuple[str, str, int]], job_date: datetime, date_order: str = "DMY"):
+def normalize_lines(
+    lines: Iterator[tuple[str, str, int, int]], job_date: datetime, date_order: str = "DMY"
+):
     state = BlockState(occurred_at=None, occurred_at_quality="UNKNOWN", title=None, payload=[])
     last_absolute: datetime | None = None
 
@@ -58,7 +60,7 @@ def normalize_lines(lines: Iterator[tuple[str, str, int]], job_date: datetime, d
             )
         state = BlockState(occurred_at=None, occurred_at_quality="UNKNOWN", title=None, payload=[])
 
-    for raw_text, raw_block_id, raw_line_index in lines:
+    for raw_text, raw_block_id, raw_line_index, global_line_no in lines:
         line = raw_text.strip()
         if not line:
             continue
@@ -84,7 +86,12 @@ def normalize_lines(lines: Iterator[tuple[str, str, int]], job_date: datetime, d
 
         cleaned = clean_payload_line(line)
         state.payload.append(
-            PayloadLine(text=cleaned, raw_block_id=raw_block_id, raw_line_index=raw_line_index)
+            PayloadLine(
+                text=cleaned,
+                raw_block_id=raw_block_id,
+                raw_line_index=raw_line_index,
+                global_line_no=global_line_no,
+            )
         )
 
     for block in flush_state():

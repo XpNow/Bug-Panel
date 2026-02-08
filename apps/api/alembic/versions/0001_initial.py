@@ -28,13 +28,18 @@ def upgrade() -> None:
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column("filename", sa.String(length=255), nullable=False),
         sa.Column("size", sa.Integer(), nullable=False),
-        sa.Column("temp_path", sa.String(length=500), nullable=False),
-        sa.Column("completed", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+        sa.Column("status", sa.String(length=20), nullable=False, server_default="OPEN"),
+        sa.Column("chunk_size", sa.Integer(), nullable=False),
+        sa.Column("expected_chunks", sa.Integer(), nullable=True),
+        sa.Column("received_chunks", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column("temp_prefix", sa.String(length=500), nullable=False),
+        sa.Column("final_sha256", sa.String(length=64), nullable=True),
+        sa.Column("final_uri", sa.String(length=500), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
     )
     op.create_table(
         "ingest_job",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
+        sa.Column("id", sa.BigInteger(), primary_key=True, autoincrement=True),
         sa.Column("source_file_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("status", sa.String(length=40), nullable=False),
         sa.Column("progress_json", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
@@ -92,6 +97,7 @@ def upgrade() -> None:
         CREATE TABLE event (
             id UUID PRIMARY KEY,
             source_file_id UUID NOT NULL REFERENCES source_file(id),
+            ingest_job_id BIGINT NOT NULL REFERENCES ingest_job(id),
             parser_id VARCHAR(50) NOT NULL,
             parser_version VARCHAR(20) NOT NULL,
             occurred_at TIMESTAMPTZ NULL,
@@ -101,17 +107,19 @@ def upgrade() -> None:
             dst_player_id INTEGER NULL REFERENCES dict_player(id),
             item_id INTEGER NULL REFERENCES dict_item(id),
             container_id INTEGER NULL REFERENCES dict_container(id),
-            amount NUMERIC(20,2) NULL,
-            qty NUMERIC(20,2) NULL,
+            money BIGINT NULL,
+            qty BIGINT NULL,
             metadata JSONB NULL,
             raw_block_id UUID NOT NULL REFERENCES raw_block(id),
             raw_line_index INTEGER NOT NULL,
-            dedupe_hash VARCHAR(64) NOT NULL,
+            global_line_no BIGINT NOT NULL,
+            dedupe_key TEXT NOT NULL,
             created_at TIMESTAMPTZ NOT NULL
         ) PARTITION BY RANGE (occurred_at);
         """
     )
-    op.execute("CREATE UNIQUE INDEX uq_event_dedupe ON event (dedupe_hash);")
+    op.execute("CREATE INDEX event_job_time_idx ON event (ingest_job_id, occurred_at);")
+    op.execute("CREATE INDEX event_job_type_idx ON event (ingest_job_id, event_type_id);")
 
     now = datetime.datetime.utcnow()
     start = datetime.datetime(now.year, now.month, 1)
@@ -122,12 +130,24 @@ def upgrade() -> None:
     op.execute(
         f"CREATE TABLE event_{start:%Y_%m} PARTITION OF event FOR VALUES FROM ('{start.isoformat()}') TO ('{end.isoformat()}');"
     )
+    op.execute(
+        f"CREATE UNIQUE INDEX event_{start:%Y_%m}_dedupe_key_uq ON event_{start:%Y_%m} (dedupe_key);"
+    )
+    op.execute(
+        f"CREATE INDEX event_{start:%Y_%m}_job_time_idx ON event_{start:%Y_%m} (ingest_job_id, occurred_at);"
+    )
+    op.execute(
+        f"CREATE INDEX event_{start:%Y_%m}_job_type_idx ON event_{start:%Y_%m} (ingest_job_id, event_type_id);"
+    )
     op.execute("CREATE TABLE event_notime PARTITION OF event DEFAULT;")
+    op.execute("CREATE UNIQUE INDEX event_notime_dedupe_key_uq ON event_notime (dedupe_key);")
+    op.execute("CREATE INDEX event_notime_job_time_idx ON event_notime (ingest_job_id, occurred_at);")
+    op.execute("CREATE INDEX event_notime_job_type_idx ON event_notime (ingest_job_id, event_type_id);")
 
     op.create_table(
         "unknown_signature",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("ingest_job_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("ingest_job_id", sa.BigInteger(), nullable=False),
         sa.Column("signature", sa.String(length=400), nullable=False),
         sa.Column("count", sa.Integer(), nullable=False, server_default="1"),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),

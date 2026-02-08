@@ -26,6 +26,7 @@ class ConnectParser(Parser):
                     metadata={"ip": match.group("ip")},
                     raw_block_id=payload.raw_block_id,
                     raw_line_index=payload.raw_line_index,
+                    global_line_no=payload.global_line_no,
                 )
             elif match := DISCONNECT.search(line):
                 event_type = "DISCONNECT"
@@ -38,4 +39,5 @@ class ConnectParser(Parser):
                     metadata=metadata,
                     raw_block_id=payload.raw_block_id,
                     raw_line_index=payload.raw_line_index,
+                    global_line_no=payload.global_line_no,
                 )

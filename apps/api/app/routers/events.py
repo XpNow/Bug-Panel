@@ -16,8 +16,11 @@ router = APIRouter(prefix="/events", tags=["events"])
 @router.get("", response_model=list[EventOut])
 def list_events(
     db: Session = Depends(get_db),
+    ingest_job_id: int | None = None,
     event_type: str | None = None,
     player_id: str | None = None,
+    container_id: str | None = None,
+    item_id: str | None = None,
     start: datetime | None = None,
     end: datetime | None = None,
     limit: int = Query(default=100, le=500),
@@ -33,10 +36,16 @@ def list_events(
         .outerjoin(DictItem, Event.item_id == DictItem.id)
         .outerjoin(DictContainer, Event.container_id == DictContainer.id)
     )
+    if ingest_job_id:
+        query = query.filter(Event.ingest_job_id == ingest_job_id)
     if event_type:
         query = query.filter(DictEventType.key == event_type)
     if player_id:
         query = query.filter((src_player.player_id == player_id) | (dst_player.player_id == player_id))
+    if container_id:
+        query = query.filter(DictContainer.key == container_id)
+    if item_id:
+        query = query.filter(DictItem.name == item_id)
     if start:
         query = query.filter(Event.occurred_at >= start)
     if end:
@@ -47,6 +56,7 @@ def list_events(
         events.append(
             EventOut(
                 id=event.id,
+                ingest_job_id=event.ingest_job_id,
                 occurred_at=event.occurred_at,
                 occurred_at_quality=event.occurred_at_quality,
                 event_type=event_type_row.key,
@@ -54,11 +64,12 @@ def list_events(
                 dst_player_id=dst_player.player_id if dst_player else None,
                 item=item.name if item else None,
                 container=container.key if container else None,
-                amount=float(event.amount) if event.amount is not None else None,
-                qty=float(event.qty) if event.qty is not None else None,
+                money=event.money,
+                qty=event.qty,
                 metadata=event.metadata,
                 raw_block_id=event.raw_block_id,
                 raw_line_index=event.raw_line_index,
+                global_line_no=event.global_line_no,
             )
         )
     return events
@@ -83,6 +94,7 @@ def get_event(event_id: uuid.UUID, db: Session = Depends(get_db)):
     event, event_type_row, src_player, dst_player, item, container = row
     return EventOut(
         id=event.id,
+        ingest_job_id=event.ingest_job_id,
         occurred_at=event.occurred_at,
         occurred_at_quality=event.occurred_at_quality,
         event_type=event_type_row.key,
@@ -90,9 +102,10 @@ def get_event(event_id: uuid.UUID, db: Session = Depends(get_db)):
         dst_player_id=dst_player.player_id if dst_player else None,
         item=item.name if item else None,
         container=container.key if container else None,
-        amount=float(event.amount) if event.amount is not None else None,
-        qty=float(event.qty) if event.qty is not None else None,
+        money=event.money,
+        qty=event.qty,
         metadata=event.metadata,
         raw_block_id=event.raw_block_id,
         raw_line_index=event.raw_line_index,
+        global_line_no=event.global_line_no,
     )

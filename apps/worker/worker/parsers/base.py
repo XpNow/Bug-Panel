@@ -9,6 +9,7 @@ class PayloadLine:
     text: str
     raw_block_id: str
     raw_line_index: int
+    global_line_no: int
 
 
 @dataclass
@@ -26,11 +27,12 @@ class EventData:
     dst_player_id: str | None = None
     item: str | None = None
     container: str | None = None
-    amount: float | None = None
-    qty: float | None = None
+    money: int | None = None
+    qty: int | None = None
     metadata: dict | None = None
     raw_block_id: str | None = None
     raw_line_index: int | None = None
+    global_line_no: int | None = None
 
 
 class Parser:

@@ -7,7 +7,7 @@ Phoenix Investigation Panel V2 este un panel web pentru analiza logurilor FiveM 
 - Upload chunked (5GB+) + ingest pornit din UI/API.
 - Evidence-first: fiecare event are pointer la raw block + line index, iar API-ul returneaza contextul.
 - Compact: raw text in blocuri zstd in object store, metadata in Postgres.
-- Imutabil + idempotent: reprocess prin job nou si dedupe pe hash.
+- Imutabil + idempotent: reprocess prin job nou si dedupe pe hash stabil.
 - Parsare streaming cu state machine pentru formatele Discord (stil A/B).
 
 ## Structura repo
@@ -24,6 +24,8 @@ Phoenix Investigation Panel V2 este un panel web pentru analiza logurilor FiveM 
 
 docker compose up --build
 ```
+
+Deschide UI: `http://localhost:3000`
 
 ### Migrations
 
@@ -65,7 +67,7 @@ python scripts/ingest_sample.py
 
 ## Note tehnice
 
-- Partitionare events: tabela `event` este partitionata lunar + default partition `event_notime`.
+- Partitionare events: tabela `event` este partitionata lunar + default partition `event_notime` cu unique index pe `dedupe_key`.
 - `date_order=DMY` este default pentru timestamps; poate fi extins in worker config.
 - Object store local: `./data/object-store` (MVP), usor de inlocuit cu S3/MinIO.
 
@@ -73,6 +75,7 @@ python scripts/ingest_sample.py
 
 - Dashboard, Imports, Events Explorer, Players, Containers, Report Packs.
 - Evidence Drawer este expus prin endpointul `/evidence/raw-line`.
+- Config web: `NEXT_PUBLIC_API_BASE_URL` (default `http://localhost:8000`).
 
 ## Worker
 

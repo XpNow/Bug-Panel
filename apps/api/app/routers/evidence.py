@@ -32,4 +32,13 @@ def get_raw_line(
         raise HTTPException(status_code=404, detail="Line index out of range")
     start = max(0, line_index - context)
     end = min(len(lines), line_index + context + 1)
-    return EvidenceOut(raw_block_id=raw_block_id, line_index=line_index, context=lines[start:end])
+    context_before = lines[start:line_index]
+    context_after = lines[line_index + 1 : end]
+    return EvidenceOut(
+        raw_block_id=raw_block_id,
+        line_index=line_index,
+        line=lines[line_index],
+        context_before=context_before,
+        context_after=context_after,
+        global_line_no=None,
+    )
