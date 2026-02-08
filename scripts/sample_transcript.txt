@@ -1,0 +1,21 @@
+— 2/4/2026 4:58 PM
+Transfer (Bancar)
+Ionel[123] a transferat 5000$ lui Maria[456].
+
+— Yesterday at 8:47 PM
+💵 Telefon
+Jucătorului: A(111) i-au fost luati 637000 $
+Jucătorului: B(222) i-au fost adaugati 637000 $
+
+Made by Synked•Today at 1:52 AM
+⚠️ Obiect aruncat pe jos
+Jucător: Marius (333) a aruncat pe jos 2x shotgun
+
+— 2/4/2026 5:10 PM
+Transfera Item
+[TRANSFER] Player[123] a pus in portbagaj_84_3xmas_azr350 item-ul lockpick(x1).
+[REMOVE] Player[123] a scos din portbagaj_84_3xmas_azr350 item-ul lockpick(x1).
+
+— 2/4/2026 5:20 PM
+Server Disconnect
+Player[123] s-a deconectat | (r: Exiting)
